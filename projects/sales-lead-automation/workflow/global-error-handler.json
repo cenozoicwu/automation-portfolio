@@ -1,0 +1,117 @@
+{
+  "name": "Global Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "568c9133-bce0-45d4-aec5-afe238782bb1",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7d4fbb12-94ec-402b-9968-1988480317f7",
+              "name": "timestamp",
+              "value": "={{ $now.setZone('Asia/Shanghai').toFormat('yyyy-MM-dd HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "e970055a-f181-4c85-9755-52f9a0f5979e",
+              "name": "workflow_name",
+              "value": "={{ $json.workflow?.name ?? 'Unknown Workflow' }}",
+              "type": "string"
+            },
+            {
+              "id": "ef90d5c3-5a88-4322-814f-d10cb91ba5f6",
+              "name": "execution_id",
+              "value": "={{ $json.execution?.id ?? 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "05d9bb41-86fe-42a4-9979-6f8c1dd00b26",
+              "name": "failed_node",
+              "value": "={{ $json.execution?.lastNodeExecuted ?? 'Unknown Node' }}",
+              "type": "string"
+            },
+            {
+              "id": "d334d9db-6a6e-4eeb-84d8-c13892c9fed6",
+              "name": "error_message",
+              "value": "={{ $json.execution?.error?.message ?? $json.trigger?.error?.message ?? 'Unknown Error' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf1926c4-0f81-4b84-9c78-30b0dc55f65d",
+              "name": "execution_url",
+              "value": "={{ $json.execution?.url ?? 'N/A' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "0855c0fa-4fe4-448e-9af1-12ecf82fd4cf",
+      "name": "Format Error Alert"
+    },
+    {
+      "parameters": {
+        "sendTo": "alerts@example.com",
+        "subject": "={{ '[n8n ERROR] ' + $json.workflow_name + ' - ' + $json.failed_node }}",
+        "emailType": "text",
+        "message": "={{\n  'n8n Workflow Failure Alert\\n\\n' +\n  'Time: ' + $json.timestamp + '\\n' +\n  'Workflow: ' + $json.workflow_name + '\\n' +\n  'Failed Node: ' + $json.failed_node + '\\n' +\n  'Execution ID: ' + $json.execution_id + '\\n\\n' +\n  'Error Message:\\n' + $json.error_message + '\\n\\n' +\n  'Execution URL:\\n' + $json.execution_url + '\\n\\n' +\n  'Please investigate the failed workflow.'\n}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        0
+      ],
+      "id": "f746f6b6-f718-4ea6-8208-6f4cf24063c3",
+      "name": "Send a message"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Alert": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

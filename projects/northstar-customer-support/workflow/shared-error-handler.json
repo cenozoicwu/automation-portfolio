@@ -1,0 +1,311 @@
+{
+  "name": "P02 - Shared Error Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "model_provider"
+            },
+            {
+              "name": "error_type"
+            },
+            {
+              "name": "error_message"
+            },
+            {
+              "name": "session_id"
+            },
+            {
+              "name": "execution_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -144,
+        0
+      ],
+      "id": "43095ef9-60dd-47a1-a228-e8dba6bf6379",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e5d1fa30-5892-4894-a8c6-7b11866134dd",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "bf5e8d37-cc2a-4243-9438-a612164ad0fc",
+              "name": "execution_id",
+              "value": "={{ $json.execution_id }}",
+              "type": "string"
+            },
+            {
+              "id": "91fca332-b887-4991-84f0-0de63bb75d67",
+              "name": "model_provider",
+              "value": "={{ $json.model_provider }}",
+              "type": "string"
+            },
+            {
+              "id": "6caf89ae-6b83-4729-ae2e-cc83ecd9c58b",
+              "name": "error_type",
+              "value": "={{ $json.error_type }}",
+              "type": "string"
+            },
+            {
+              "id": "d27d67b5-ec15-4b53-8cfe-a980374a16e7",
+              "name": "error_message",
+              "value": "={{ $json.error_message }}",
+              "type": "string"
+            },
+            {
+              "id": "18613602-4839-4ae2-a71a-c8105f2445ca",
+              "name": "session_id",
+              "value": "={{ $json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3b05f3c9-012c-4b49-a081-0af0bbadf508",
+              "name": "raw_error_message",
+              "value": "={{ $json.raw_error_message ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "b4dde8ff-df73-44ec-9870-2c51fe293356",
+      "name": "Prepare Error Log"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "38ab18b0-971b-43ba-b19c-7a66435bae84",
+              "name": "output",
+              "value": "Sorry, our AI support service is temporarily unavailable. Please try again later.",
+              "type": "string"
+            },
+            {
+              "id": "8867d273-76b2-4031-89d0-882b359d3a2b",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f296d93b-5a56-40b5-857c-1c40fdcb24b9",
+              "name": "error_type",
+              "value": "={{ $('Classify Error').first().json.error_type ?? 'UNKNOWN_ERROR' }}",
+              "type": "string"
+            },
+            {
+              "id": "3e4de8fa-045a-4f87-b553-536b71a3bbbc",
+              "name": "error_message",
+              "value": "={{ $('Classify Error').first().json.error_message ?? 'An unexpected error occurred' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        640,
+        0
+      ],
+      "id": "249d4301-e1bf-4635-b3ec-dccd47389330",
+      "name": "Final Error Reply"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 798035043,
+          "mode": "list",
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "execution_id": "={{ $json.execution_id }}",
+            "model_provider": "={{ $json.model_provider }}",
+            "error_type": "={{ $json.error_type }}",
+            "error_message": "={{ $json.error_message }}",
+            "session_id": "={{ $json.session_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "model_provider",
+              "displayName": "model_provider",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error_type",
+              "displayName": "error_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error_message",
+              "displayName": "error_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        416,
+        0
+      ],
+      "id": "a59b8c16-1a8c-4226-aeec-ff9d22cc647f",
+      "name": "Append Agent Error Log",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIALS_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst input = $input.item.json;\nconst message = String(input.error_message ?? '');\n\nlet errorType = 'UNKNOWN_ERROR';\nlet safeMessage = 'Unclassified model execution error';\n\n// Order matters: check specific errors first.\nif (\n  /model_not_found|model (?:not exist|does not exist|not found)/i.test(message)\n) {\n  errorType = 'MODEL_NOT_FOUND';\n  safeMessage = 'Requested AI model was not found';\n\n} else if (\n  /\\b(401|403)\\b|unauthorized|forbidden|invalid api key|authentication failed/i.test(message)\n) {\n  errorType = 'AUTH_ERROR';\n  safeMessage = 'Model authentication or access denied';\n\n} else if (\n  /\\b429\\b|rate.limit|too many requests|quota exceeded/i.test(message)\n) {\n  errorType = 'RATE_LIMIT';\n  safeMessage = 'Model API rate limit or quota exceeded';\n\n} else if (\n  /\\b(408|504)\\b|timed? out|timeout/i.test(message)\n) {\n  errorType = 'TIMEOUT';\n  safeMessage = 'Model request timed out';\n\n} else if (\n  /\\b(500|502|503)\\b|service unavailable|bad gateway/i.test(message)\n) {\n  errorType = 'SERVICE_UNAVAILABLE';\n  safeMessage = 'Model service temporarily unavailable';\n\n} else if (\n  /\\b404\\b|resource.*not.*found|could not be found/i.test(message)\n) {\n  errorType = 'RESOURCE_NOT_FOUND';\n  safeMessage = 'Requested model resource was not found';\n\n} else if (\n  /\\b400\\b|invalid request|bad request/i.test(message)\n) {\n  errorType = 'INVALID_REQUEST';\n  safeMessage = 'Model request was invalid';\n\n} else if (\n  /\\bfetch failed\\b|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|network error|connection refused/i.test(message)\n) {\n  errorType = 'NETWORK_ERROR';\n  safeMessage = 'Model network request failed';\n\n} else if (\n  input.error_type === 'MODEL_EXECUTION_FAILED'\n) {\n  errorType = 'MODEL_EXECUTION_FAILED';\n  safeMessage = 'Model execution failed';\n}\n\n\nreturn {\n  json: {\n    model_provider: input.model_provider ?? 'unknown',\n    error_type: errorType,\n    error_message: safeMessage,\n    raw_error_message: message,\n    session_id: input.session_id ?? 'unknown',\n    execution_id: input.execution_id ?? 'unknown'\n  }\n};\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        0
+      ],
+      "id": "a71d7a2f-8bf0-4134-8e09-3e6143e9fbc8",
+      "name": "Classify Error"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Classify Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Log": {
+      "main": [
+        [
+          {
+            "node": "Append Agent Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Agent Error Log": {
+      "main": [
+        [
+          {
+            "node": "Final Error Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Error": {
+      "main": [
+        [
+          {
+            "node": "Prepare Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0b57fcdc-3861-4d84-b14c-7cf4223e17a0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6deb8ec761c875dd5b5545926ea10de9e3db547082f3cce575b6add425140301"
+  },
+  "nodeGroups": [],
+  "id": "HPXrjW6qI19Xlcb0",
+  "tags": []
+}
