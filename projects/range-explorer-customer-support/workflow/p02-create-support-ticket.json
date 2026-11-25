@@ -99,14 +99,12 @@
         "documentId": {
           "__rl": true,
           "value": "REPLACE_WITH_SPREADSHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Northstar Support Demo"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Support Tickets"
+          "mode": "id"
         },
         "filtersUI": {
           "values": [
@@ -242,14 +240,12 @@
         "documentId": {
           "__rl": true,
           "value": "REPLACE_WITH_SPREADSHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Northstar Support Demo"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Support Tickets"
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -412,8 +408,8 @@
     {
       "parameters": {
         "sendTo": "support@example.com",
-        "subject": "={{ '[Northstar Support] New Ticket - ' + $('Generate Ticket ID').first().json.ticket_id }}",
-        "message": "=\n{{ `A new customer support ticket has been created.\n\nTicket ID: ${$('Generate Ticket ID').first().json.ticket_id}\nCreated At: ${$('Generate Ticket ID').first().json.created_at}\n\nCustomer Email: ${$('Generate Ticket ID').first().json.customer_email}\nOrder ID: ${$('Generate Ticket ID').first().json.order_id || 'N/A'}\n\nIssue Type: ${$('Generate Ticket ID').first().json.issue_type}\n\nIssue Summary:\n${$('Generate Ticket ID').first().json.issue_summary}\n\nTicket Status: OPEN\n\nPlease review this ticket and follow up with the customer.\n\n---\nNorthstar Customer Support Automation\n` }}\n",
+        "subject": "={{ '[Range Explorer Support] New Ticket - ' + $('Generate Ticket ID').first().json.ticket_id }}",
+        "message": "={{ (() => {\n  const ticket = $('Generate Ticket ID').first().json;\n\n  const escapeHtml = (value) => String(value ?? '')\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#39;');\n\n  return `\n<div style=\"font-family:Arial,sans-serif; background-color:#F5F2E9; padding:24px; color:#263238;\">\n\n  <div style=\"max-width:640px; margin:0 auto; background-color:#FFFFFF; border:1px solid #E0E0E0;\">\n\n    <div style=\"background-color:#203B32; padding:24px;\">\n      <h1 style=\"color:#FFFFFF; font-size:23px; margin:0;\">\n        RANGE EXPLORER OUTDOOR\n      </h1>\n      <p style=\"color:#D8A76C; font-size:13px; margin:8px 0 0;\">\n        Customer Support Operations\n      </p>\n    </div>\n\n    <div style=\"padding:24px;\">\n\n      <h2 style=\"font-size:20px; color:#203B32; margin-top:0;\">\n        New Support Ticket\n      </h2>\n\n      <p>Hi Support Team,</p>\n\n      <p>\n        A new customer support ticket has been submitted\n        through Oliver, our AI Customer Support Assistant,\n        and requires human review.\n      </p>\n\n      <table style=\"width:100%; border-collapse:collapse; font-size:14px;\">\n\n        <tr style=\"background-color:#F5F2E9;\">\n          <td style=\"padding:12px; width:35%;\"><strong>Ticket ID</strong></td>\n          <td style=\"padding:12px;\">${escapeHtml(ticket.ticket_id)}</td>\n        </tr>\n\n        <tr>\n          <td style=\"padding:12px;\"><strong>Created At</strong></td>\n          <td style=\"padding:12px;\">${escapeHtml(ticket.created_at)}</td>\n        </tr>\n\n        <tr style=\"background-color:#F5F2E9;\">\n          <td style=\"padding:12px;\"><strong>Customer Email</strong></td>\n          <td style=\"padding:12px;\">${escapeHtml(ticket.customer_email)}</td>\n        </tr>\n\n        <tr>\n          <td style=\"padding:12px;\"><strong>Order ID</strong></td>\n          <td style=\"padding:12px;\">${escapeHtml(ticket.order_id || 'N/A')}</td>\n        </tr>\n\n        <tr style=\"background-color:#F5F2E9;\">\n          <td style=\"padding:12px;\"><strong>Issue Type</strong></td>\n          <td style=\"padding:12px;\">${escapeHtml(ticket.issue_type)}</td>\n        </tr>\n\n        <tr>\n          <td style=\"padding:12px;\"><strong>Ticket Status</strong></td>\n          <td style=\"padding:12px;\">\n            <span style=\"background-color:#FFF0D6; color:#925B13; padding:5px 10px; font-weight:bold;\">\n              OPEN\n            </span>\n          </td>\n        </tr>\n\n      </table>\n\n      <h3 style=\"color:#203B32; font-size:16px; margin-top:24px;\">\n        Issue Summary\n      </h3>\n\n      <div style=\"background-color:#F5F2E9; padding:16px; border-left:4px solid #D8A76C; line-height:1.6; white-space:pre-wrap;\">${escapeHtml(ticket.issue_summary)}</div>\n\n      <h3 style=\"color:#203B32; font-size:16px;\">\n        Action Required\n      </h3>\n\n      <p>\n        Please review the customer's request and follow up\n        in accordance with company policies.\n      </p>\n\n      <p>\n        This ticket requires human review. No refund,\n        compensation, or policy exception has been approved\n        by the AI assistant.\n      </p>\n\n      <p style=\"margin-top:24px;\">\n        Best regards,<br>\n        <strong>Oliver Bennett</strong><br>\n        AI Customer Support Assistant\n      </p>\n\n    </div>\n\n    <div style=\"background-color:#203B32; padding:18px; text-align:center;\">\n      <p style=\"color:#FFFFFF; font-size:13px; margin:0;\">\n        Range Explorer Outdoor\n      </p>\n      <p style=\"color:#D8A76C; font-size:12px; margin:8px 0 0;\">\n        Explore Further. Experience More.\n      </p>\n      <p style=\"color:#CFD8D3; font-size:11px; margin:12px 0 0;\">\n        Automated notification | Development Demo\n      </p>\n    </div>\n\n  </div>\n</div>\n`;\n})() }}",
         "options": {}
       },
       "type": "n8n-nodes-base.gmail",
@@ -432,14 +428,12 @@
         "documentId": {
           "__rl": true,
           "value": "REPLACE_WITH_SPREADSHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Northstar Support Demo"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Support Tickets"
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -572,14 +566,12 @@
         "documentId": {
           "__rl": true,
           "value": "REPLACE_WITH_SPREADSHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Northstar Support Demo"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Support Tickets"
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -916,8 +908,7 @@
         "dataTableId": {
           "__rl": true,
           "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
-          "mode": "list",
-          "cachedResultName": "P02 - Pending Support Tickets"
+          "mode": "id"
         },
         "matchType": "allConditions",
         "filters": {
@@ -1004,8 +995,7 @@
         "dataTableId": {
           "__rl": true,
           "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
-          "mode": "list",
-          "cachedResultName": "P02 - Pending Support Tickets"
+          "mode": "id"
         },
         "matchType": "allConditions",
         "filters": {
@@ -1198,8 +1188,7 @@
         "dataTableId": {
           "__rl": true,
           "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
-          "mode": "list",
-          "cachedResultName": "P02 - Pending Support Tickets"
+          "mode": "id"
         },
         "matchType": "allConditions",
         "filters": {
@@ -1344,8 +1333,7 @@
         "dataTableId": {
           "__rl": true,
           "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
-          "mode": "list",
-          "cachedResultName": "P02 - Pending Support Tickets"
+          "mode": "id"
         },
         "matchType": "allConditions",
         "filters": {
@@ -1505,8 +1493,7 @@
         "dataTableId": {
           "__rl": true,
           "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
-          "mode": "list",
-          "cachedResultName": "P02 - Pending Support Tickets"
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -1635,8 +1622,7 @@
         "dataTableId": {
           "__rl": true,
           "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
-          "mode": "list",
-          "cachedResultName": "P02 - Pending Support Tickets"
+          "mode": "id"
         },
         "matchType": "allConditions",
         "filters": {
