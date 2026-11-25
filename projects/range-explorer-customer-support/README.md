@@ -1,24 +1,34 @@
-
-# Northstar Customer Support Agent
+# Range Explorer Customer Support Agent
 
 **AI-Powered Customer Support Automation | n8n + Ollama + Qdrant**
 
-![Version](https://img.shields.io/badge/version-1.1-blue)
+![Version](https://img.shields.io/badge/version-1.2-blue)
+
 ![Status](https://img.shields.io/badge/status-functional_demo-green)
+
 ![Architecture](https://img.shields.io/badge/architecture-hybrid_AI-orange)
+
 ![LLM](https://img.shields.io/badge/LLM-Ollama-purple)
 
 ## Project Overview
 
-Northstar Customer Support Agent is a locally hosted AI-powered customer support automation solution built for a fictional UK-based outdoor equipment retailer.
+Range Explorer Customer Support Agent is a locally hosted AI-powered customer support automation solution built for Range Explorer Outdoor, a fictional UK-based online retailer specializing in hiking apparel, camping equipment, and outdoor accessories.
 
 The project demonstrates how businesses can combine AI agents, retrieval-augmented generation (RAG), structured business data, and deterministic workflow automation to handle common customer service requests.
+
+The customer-facing assistant, Oliver Bennett, communicates in natural American English while operating within UK business policies and delivery dates.
 
 Rather than relying entirely on an LLM to execute business operations, the solution separates AI-driven reasoning from controlled business execution.
 
 This architecture is designed to reduce repetitive manual work, improve operational consistency, and mitigate risks associated with AI-generated decisions.
 
-**Project Status:** v1.1 — Functional development demo using synthetic customer and order data.
+**Project Status:** v1.2 — Functional development demo using synthetic customer and order data.
+
+## Demo Scenario
+
+Alice Morgan is preparing for a weekend hiking trip in Wales, but her waterproof jacket has not arrived. Oliver Bennett, an AI customer support assistant, checks her order, explains the verified delay, retrieves relevant store policies, and prepares a compensation request for human review. Alice explicitly confirms the ticket before the workflow records it and notifies the support team. No compensation is approved by the AI.
+
+This is the planned video demonstration scenario; the video has not yet been published.
 
 ## Business Challenges
 
@@ -40,7 +50,7 @@ The solution combines the following capabilities:
 - RAG-based policy retrieval.
 - Structured order data integration.
 - Deterministic delivery status calculation.
-- Human-in-the-loop support ticket approval.
+- Human-in-the-loop support ticket authorization.
 - Persistent authorization state management.
 - Replay protection and business-level duplicate detection.
 - Centralized error handling and notification tracking.
@@ -69,6 +79,7 @@ The core design principle is:
 
 ### 1. AI-Powered Customer Support
 
+- Presents a branded Hosted Chat experience and a transparent AI persona, Oliver Bennett.
 - Uses a locally hosted Ollama language model (`qwen3:14b`) to interpret customer requests.
 - Maintains conversational context through shared conversation memory.
 - Identifies customer intent and selects appropriate tools.
@@ -82,6 +93,34 @@ The core design principle is:
 - Rewrites context-dependent customer questions into standalone retrieval queries.
 - Retrieves relevant knowledge about shipping, returns, refunds, warranties, compensation, and support escalation.
 - Instructs the AI Agent to acknowledge insufficient policy information rather than inventing policies.
+
+### Knowledge Base Ingestion and Section-Based Chunking (v1.2)
+
+The ingestion workflow splits the fictional policy document into six sections using Markdown heading markers, preserving the section title and content before embedding. Each section includes structured metadata for traceability.
+
+```mermaid
+flowchart LR
+    A[Policy Document] --> B[Split Knowledge by Section]
+    B --> C[Data Loader and Text Splitter]
+    C --> D[Ollama Embeddings]
+    D --> E[(Qdrant Collection V2)]
+    E --> F[Context-Aware Retrieval Tool]
+```
+
+| Configuration | Exported Value |
+|---|---|
+| Collection | `range_explorer_knowledge_base_V2` |
+| Document version | `1.1` |
+| Embedding model | `nomic-embed-text:latest` |
+| Chunk size | 2000 |
+| Chunk overlap | 80 |
+| Separator (as exported) | `\n\n` |
+| Embedding batch size | 768 |
+| Metadata | `section_id`, `section_title`, `source`, `document_version` |
+
+Both ingestion and retrieval reference the same case-sensitive collection name. A separate versioned collection allows knowledge base changes without overwriting the previous collection. Section-based splitting is rule-based, not embedding-based semantic chunking. The configured text splitter may further divide long sections.
+
+The knowledge base contains no explicit compensation eligibility policy. The assistant is instructed to acknowledge uncertainty and offer human review rather than promise compensation.
 
 ### 3. Verified Order Lookup
 
@@ -107,7 +146,7 @@ The workflow:
 
 This approach reduces the risk of incorrect date calculations and unsupported delivery status assumptions.
 
-The system does not provide live carrier tracking.
+The system does not provide live carrier tracking. The v1.2 prompt explicitly distinguishes estimated delivery dates from shipment dates and instructs the model to use the returned overdue calendar-day count.
 
 ### 5. Human-in-the-Loop Support Escalation
 
@@ -184,7 +223,7 @@ The workflow checks existing open support tickets using business-level informati
 - Issue classification.
 - Ticket status.
 
-When an existing matching open ticket is found, the system returns the existing ticket identifier instead of creating another ticket.
+When an existing matching open ticket is found, the ticket workflow returns the existing ticket identifier instead of creating another ticket. The chat response may summarize the outcome without displaying that identifier.
 
 This mechanism was exercised in sequential cross-session testing.
 
@@ -192,10 +231,10 @@ This mechanism was exercised in sequential cross-session testing.
 
 After a new support ticket is recorded:
 
-- Gmail sends a notification to the support team.
+- Gmail sends a branded HTML notification to the support team, including the ticket details and a human-review notice.
 - The notification outcome is recorded in Google Sheets.
 - Successful and failed notifications are handled through separate workflow branches.
-- The customer receives a structured response containing the ticket identifier and notification status.
+- The workflow returns a structured business result containing the ticket identifier and notification status; the customer-facing response is formatted separately.
 
 A notification failure does not automatically mean that ticket creation has failed.
 
@@ -216,51 +255,38 @@ The solution uses a hybrid architecture consisting of an AI reasoning layer, a h
 flowchart TD
     A[Customer Chat] --> B[n8n Chat Trigger]
     B --> C{Explicit Confirmation?}
-
-    C -->|No| D[AI Customer Support Agent]
+    C -->|No| D[Oliver Bennett - AI Assistant]
     C -->|Yes| J[Load Pending Request]
-
     D --- E[Ollama LLM]
     D --- F[Conversation Memory]
     D --- G[Qdrant RAG]
     D --- H[Order Lookup Tool]
     D --- I[Ticket Preparation Tool]
-
     G --- GE[Ollama Embeddings]
     H --> HS[(Google Sheets Orders)]
-
     I --> P[Prepare Ticket Preview]
     P --> Q[(Pending Ticket Data Table)]
-
     D --> R{Prepared Ticket Available?}
     Q -.-> R
-
     R -->|Yes| S[Activate and Return Preview]
     R -->|No| T[Validate AI Response]
-
     S --> U[Customer Review]
     U -.->|Next Chat Message| B
-
     T --> V[Customer Response]
-
     J --> K{Authorization Valid?}
     K -->|No| L[Reject Confirmation]
     K -->|Yes| M[Execute Support Ticket Workflow]
-
     M --> N{Matching Open Ticket?}
     N -->|Yes| O[Return Existing Ticket]
     N -->|No| W[Create Support Ticket]
-
     W --> X[(Google Sheets Tickets)]
     W --> Y[Gmail Notification]
     Y --> Z[Record Notification Status]
-
     O --> AA[Finalize Authorization]
     Z --> AA
     AA --> AB[Format Ticket Result]
     AB --> V
     L --> V
-
     D -.->|Execution Error| EH[Shared Error Handler]
     EH --> EL[(Google Sheets Error Logs)]
     EH --> V
@@ -285,11 +311,11 @@ The project consists of five workflows.
 
 | Workflow | Responsibility |
 |---|---|
-| [Northstar Customer Support Agent](workflow/p02-northstar-customer-support-agent-local.json) | Customer interaction, AI reasoning, RAG, tool orchestration, confirmation routing, and response formatting |
+| [Range Explorer Customer Support Agent](workflow/p02-range-explorer-customer-support-agent-local.json) | Customer interaction, AI reasoning, RAG, tool orchestration, confirmation routing, and response formatting |
 | [Order Lookup](workflow/p02-order-lookup.json) | Order retrieval, customer information matching, and deterministic delivery status calculation |
 | [Create Support Ticket](workflow/p02-create-support-ticket.json) | Ticket preparation, authorization validation, duplicate detection, ticket creation, notification, and finalization |
 | [Shared Error Handler](workflow/p02-shared-error-handler.json) | Error classification, technical logging, and customer-friendly error responses |
-| [Knowledge Base Ingestion](workflow/p02-knowledge-base-Ingestion.json) | Knowledge document preparation, text splitting, embedding generation, and Qdrant ingestion |
+| [Knowledge Base Ingestion](workflow/p02-knowledge-base-ingestion.json) | Knowledge document preparation, text splitting, embedding generation, and Qdrant ingestion |
 
 ### Main Workflow
 
@@ -340,6 +366,17 @@ The support ticket workflow is organized into five functional areas:
 | ticket_status | Support ticket status |
 | notification_status | Notification delivery status |
 
+### Google Sheets — Agent Error Logs
+
+| Field | Description |
+|---|---|
+| timestamp | Error timestamp |
+| execution_id | Workflow execution identifier |
+| model_provider | Model provider |
+| error_type | Classified error category |
+| error_message | Sanitized error description |
+| session_id | Conversation session identifier |
+
 ### n8n Data Table — Pending Support Tickets
 
 Create a Data Table named `P02 - Pending Support Tickets`.
@@ -387,7 +424,7 @@ The workflow uses the automatically generated row identifier for record-level va
 9. Bind all Data Table nodes to the newly created table.
 10. Reconfigure the sub-workflow references in the main workflow.
 11. Configure Gmail credentials and the support notification recipient.
-12. Run the Knowledge Base Ingestion workflow to populate Qdrant.
+12. Create or select the Qdrant collection `range_explorer_knowledge_base_V2` (compatible with the embedding model), then run the Knowledge Base Ingestion workflow. Verify that the main retrieval node uses the same collection.
 13. Verify all workflow dependencies and publish the required workflows.
 14. Perform functional testing before enabling customer access.
 
@@ -398,12 +435,15 @@ The public workflow files have been sanitized to remove personal credentials and
 Examples of configuration placeholders include:
 
 - `REPLACE_WITH_SPREADSHEET_ID`
+- `REPLACE_WITH_ORDERS_SHEET_ID`
+- `REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID`
+- `REPLACE_WITH_AGENT_ERROR_LOGS_SHEET_ID`
 - `REPLACE_WITH_PENDING_TICKETS_TABLE_ID`
 - `REPLACE_WITH_ORDER_LOOKUP_WORKFLOW_ID`
 - `REPLACE_WITH_CREATE_TICKET_WORKFLOW_ID`
 - `REPLACE_WITH_ERROR_HANDLER_WORKFLOW_ID`
 
-The support notification recipient is replaced with a demonstration email address.
+The support notification recipient is replaced with `support@example.com`. All public exports are inactive, and public Hosted Chat access is disabled. Rebind credentials and enable access only after testing with synthetic data.
 
 Replace all placeholders and rebind the required credentials and resources before running the workflows.
 
@@ -411,21 +451,22 @@ Replace all placeholders and rebind the required credentials and resources befor
 
 ## Testing and Validation
 
-### v1.1 Functional Regression Testing
+### v1.2 Functional Regression Testing
 
 | Test ID | Scenario | Observed Result |
 |---|---|---|
-| TC01 | Verified order lookup | Correct order details and overdue days returned |
-| TC02 | Context-aware policy retrieval | Relevant escalation response returned; policy wording requires refinement |
-| TC03 | Ticket preview | Structured preview generated before formal ticket creation |
-| TC04 | Explicit confirmation | Support ticket created and notification received |
-| TC05 | Repeated confirmation | Previously processed request rejected |
-| TC06 | Confirmation without pending request | Unauthorized confirmation rejected |
-| TC07 | Cross-session duplicate request | Existing matching open ticket identified |
+| TC01 | Brand identity and persona | Correct retailer and AI assistant identity returned |
+| TC02 | Verified order lookup | Correct carrier, tracking number, estimated delivery date, and overdue days returned |
+| TC03 | Context-aware policy retrieval | Combined order and policy response demonstrated after knowledge base update; eligibility wording remains a limitation |
+| TC04 | Ticket preview | Structured compensation request preview returned before confirmation |
+| TC05 | Authorized ticket creation | Ticket created, Google Sheets row added, and email received after recovery from an external connection failure |
+| TC06 | Repeated confirmation | Previously processed request rejected in chat |
+| TC07 | Confirmation without pending request | Confirmation rejected in a new session |
+| TC08 | Cross-session duplicate request | Existing open ticket identified in chat; duplicate creation rejected in the response |
 
-All seven scenarios were exercised during development.
+All eight scenarios were exercised in the development environment on November 25, 2026. The core customer support journey was demonstrated successfully. Some negative-path checks were confirmed through customer-facing responses only; downstream row counts, notification status, final authorization state, and HTML email layout were not comprehensively reconciled.
 
-The core customer support journey, including ticket preparation, explicit confirmation, ticket creation, and notification delivery, was demonstrated successfully.
+During TC05, a Google Sheets connection reset interrupted ticket creation after authorization had been consumed. The workflow returned an uncertain-outcome message. The ticket sheet was checked for the generated ID and matching open ticket; neither was found. After read connectivity recovered, a new preview and explicit confirmation successfully created the ticket and delivered the notification. This demonstrates manual recovery in one observed scenario, not automatic recovery or guaranteed exactly-once execution.
 
 ### Additional Development Testing
 
@@ -473,7 +514,7 @@ The project does not claim production-grade exactly-once execution.
 
 ### 3. LLM Response Reliability
 
-The locally hosted model may occasionally return empty responses or make unsupported policy interpretations.
+The locally hosted model may occasionally return empty responses, stop before completing required tool calls, or make unsupported policy interpretations. Section-based chunking improves document integrity but does not guarantee correct retrieval or policy grounding.
 
 Fallback responses and structured instructions mitigate these issues but do not eliminate all model-related risks.
 
@@ -503,7 +544,7 @@ The public workflow templates require additional setup and deployment testing.
 
 ### 8. Operational Recovery
 
-Comprehensive recovery from partial execution failures, authorization finalization failures, and interrupted processing has not been fully validated.
+Comprehensive recovery from partial execution failures, authorization finalization failures, and interrupted processing has not been fully validated. An external API failure after authorization consumption can leave a request in `PROCESSING`. Operators must reconcile ticket and notification records before retrying; automatic recovery is not implemented for this scenario.
 
 ## Future Improvements
 
@@ -524,14 +565,18 @@ Potential enhancements include:
 |---|---|
 | v1.0 | Initial AI customer support agent with RAG, order lookup, support escalation, and centralized error handling |
 | v1.1 | Context-aware retrieval, deterministic delivery calculations, structured ticket previews, persistent authorization state, replay protection, and cross-session duplicate detection |
+| v1.2 | Range Explorer rebranding, AI persona, branded chat and HTML notifications, section-based knowledge ingestion with metadata, versioned collection, and refined order response instructions |
 
 ## Project Disclaimer
 
-Northstar Outdoor Store is a fictional retailer created for demonstration purposes.
+Range Explorer Outdoor is a fictional retailer created for demonstration purposes.
 
 This project is an independent technical portfolio demonstration and is not affiliated with a real retail business.
 
-**Version:** 1.1  
-**Status:** Functional Development Demo  
-**Architecture:** Hybrid AI Reasoning and Deterministic Workflow Execution  
+**Version:** 1.2
+
+**Status:** Functional Development Demo
+
+**Architecture:** Hybrid AI Reasoning and Deterministic Workflow Execution
+
 **Primary Technologies:** n8n, Ollama, Qdrant, JavaScript, Docker, Google Sheets, Gmail
