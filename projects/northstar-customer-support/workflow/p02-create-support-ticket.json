@@ -1,0 +1,2325 @@
+{
+  "name": "p02-create-support-ticket",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "session_id"
+            },
+            {
+              "name": "customer_email"
+            },
+            {
+              "name": "order_id"
+            },
+            {
+              "name": "issue_type"
+            },
+            {
+              "name": "issue_summary"
+            },
+            {
+              "name": "customer_confirmed",
+              "type": "boolean"
+            },
+            {
+              "name": "request_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -368,
+        -976
+      ],
+      "id": "e2405367-26f1-4f23-88ca-366d128e2fc8",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Normalize input parameters\nconst input = $input.item.json;\n\nconst sessionId = String(input.session_id ?? '').trim();\nconst requestId = String(input.request_id ?? '').trim();\nconst email = String(input.customer_email ?? '').trim().toLowerCase();\nconst orderId = String(input.order_id ?? '').trim();\nconst issueType = String(input.issue_type ?? '').trim().toUpperCase();\nconst issueSummary = String(input.issue_summary ?? '').trim();\n\nconst customerConfirmed =\n  input.customer_confirmed === true;\n\n// 2. Define allowed issue types\nconst allowedTypes = [\n  'DELIVERY_ISSUE',\n  'DAMAGED_ITEM',\n  'REFUND_REQUEST',\n  'COMPENSATION_REQUEST',\n  'PAYMENT_DISPUTE',\n  'OTHER'\n];\n\n// 3. Validate request parameters\nconst errors = [];\n\nif (!sessionId) {\n  errors.push('Session ID is required');\n}\n\nif (!requestId) {\n  errors.push('Request ID is required');\n}\n\nif (\n  !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) ||\n  email.length > 254\n) {\n  errors.push('Valid customer email is required');\n}\n\nif (!allowedTypes.includes(issueType)) {\n  errors.push('Invalid issue type');\n}\n\nif (\n  issueSummary.length < 10 ||\n  issueSummary.length > 1000\n) {\n  errors.push('Issue summary must be 10-1000 characters');\n}\n\n// 4. Determine request status\nconst dataValid = errors.length === 0;\n\nlet requestStatus;\n\nif (!dataValid) {\n  requestStatus = 'VALIDATION_FAILED';\n} else if (!customerConfirmed) {\n  requestStatus = 'PENDING_CONFIRMATION';\n} else {\n  requestStatus = 'CONFIRMATION_RECEIVED';\n}\n\n// 5. Return normalized request\nreturn {\n  json: {\n    session_id: sessionId,\n    request_id: requestId,\n    customer_email: email,\n    order_id: orderId,\n    issue_type: issueType,\n    issue_summary: issueSummary,\n    customer_confirmed: customerConfirmed,\n\n    data_valid: dataValid,\n    request_status: requestStatus,\n\n    validation_passed:\n      dataValid && customerConfirmed,\n\n    validation_error: !dataValid\n      ? errors.join('; ')\n      : !customerConfirmed\n        ? 'Customer confirmation is required'\n        : ''\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -704
+      ],
+      "id": "f7c51b21-eaae-4ae3-94c0-1c7c097491f9",
+      "name": "Validate Ticket Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8b597c1b-68fd-453a-bd40-3ef367c7b5ae",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "7259b348-60e9-4d84-8930-4bf2e432fcd8",
+              "name": "ticket_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "57d13ff8-3f76-42ea-99d9-3668b4452a9f",
+              "name": "status",
+              "value": "VALIDATION_FAILED",
+              "type": "string"
+            },
+            {
+              "id": "7859405b-ddaa-4cb6-a2e9-5adf517e7458",
+              "name": "message",
+              "value": "={{ $json.validation_error }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -176,
+        -1056
+      ],
+      "id": "fe5a7f2f-3b76-4e58-8a47-44f464b87af5",
+      "name": "Return Validation Error"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Northstar Support Demo"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Support Tickets"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "order_id",
+              "lookupValue": "={{ $json.order_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1520,
+        -576
+      ],
+      "id": "9b98e86d-223d-4fb6-a8a4-841ed2041f9d",
+      "name": "Check Existing Ticket",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst request = $('Verify Authorization Consumption').first().json;\n\nconst existingRows = $input.all()\n  .map(item => item.json)\n  .filter(row => row.ticket_id);\n\nconst normalize = value =>\n  String(value ?? '')\n    .trim()\n    .toLowerCase()\n    .replace(/\\s+/g, ' ');\n\n// Detect explicit compensation intent in a ticket summary\nconst hasCompensationIntent = summary =>\n  /\\b(compensation|compensate|reimbursement|reimburse|goodwill credit)\\b|赔偿|补偿/i\n    .test(String(summary ?? ''));\n\n// Check whether two issue types represent the same request\nconst isSameIssue = (row, currentRequest) => {\n  const existingType = normalize(row.issue_type);\n  const requestedType = normalize(currentRequest.issue_type);\n\n  if (existingType === requestedType) {\n    return true;\n  }\n\n  const isDeliveryCompensationPair =\n    [existingType, requestedType].includes('delivery_issue') &&\n    [existingType, requestedType].includes('compensation_request');\n\n  if (isDeliveryCompensationPair) {\n    return (\n      hasCompensationIntent(row.issue_summary) &&\n      hasCompensationIntent(currentRequest.issue_summary)\n    );\n  }\n\n  return false;\n};\n\nconst duplicate = existingRows.find(row =>\n  normalize(row.customer_email) === normalize(request.customer_email) &&\n  normalize(row.order_id) === normalize(request.order_id) &&\n  normalize(row.ticket_status) === 'open' &&\n  isSameIssue(row, request)\n);\n\nreturn [\n  {\n    json: {\n      ...request,\n      is_duplicate: Boolean(duplicate),\n      existing_ticket_id: duplicate?.ticket_id ?? '',\n      existing_notification_status:\n        duplicate?.notification_status ?? ''\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        -576
+      ],
+      "id": "e0decbf3-ba4a-4d76-af66-7c95b3a315ea",
+      "name": "Check Duplicate Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "5c6769ed-f7ac-4055-a189-083c952d23e7",
+              "leftValue": "={{ $json.is_duplicate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1968,
+        -576
+      ],
+      "id": "2cbd12bf-8841-4e4c-9b2d-2857378f011f",
+      "name": "IF - Duplicate Found"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "42544453-a2a8-43a4-a493-e27637e01983",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "79d8d4b8-2e9f-4253-a158-03a8edf689eb",
+              "name": "ticket_id",
+              "value": "={{ $json.existing_ticket_id }}",
+              "type": "string"
+            },
+            {
+              "id": "577bc0ce-e5ed-4d27-8965-fa9fd204c645",
+              "name": "status",
+              "value": "ALREADY_EXISTS",
+              "type": "string"
+            },
+            {
+              "id": "31c5dbfd-6e0e-4890-8128-d45234cc4694",
+              "name": "message",
+              "value": "An existing support ticket was found for this request.",
+              "type": "string"
+            },
+            {
+              "id": "0870bbcb-6e95-4f4a-9ef0-195f5b12666e",
+              "name": "notification_status",
+              "value": "={{ $json.existing_notification_status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2176,
+        -688
+      ],
+      "id": "7f1e9ec3-8806-4f7c-b1d7-22a7162b548b",
+      "name": "Return Existing Ticket"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const request = $input.item.json;\n\n// Defensive authorization check\nif (\n  request.authorization_passed !== true ||\n  request.authorization_consumed !== true\n) {\n  throw new Error(\n    'Ticket creation blocked: valid authorization is required.'\n  );\n}\n\n// Generate UTC timestamp\nconst now = new Date();\nconst createdAt = now.toISOString();\n\n// Generate ticket ID\nconst datePart = createdAt.slice(0, 10).replace(/-/g, '');\n\nconst randomPart = (\n  Math.random().toString(36).slice(2, 8) +\n  Math.random().toString(36).slice(2, 6)\n).toUpperCase();\n\nconst ticketId = `TKT-${datePart}-${randomPart}`;\n\n// Prepare ticket record\nreturn {\n  json: {\n    ticket_id: ticketId,\n    created_at: createdAt,\n    session_id: request.session_id,\n    customer_email: request.customer_email,\n    order_id: request.order_id,\n    issue_type: request.issue_type,\n    issue_summary: request.issue_summary,\n    ticket_status: 'OPEN',\n    notification_status: 'PENDING'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        -480
+      ],
+      "id": "b0e0faca-4de9-437e-a23a-a28fabb9a289",
+      "name": "Generate Ticket ID"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Northstar Support Demo"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Support Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $json.ticket_id }}",
+            "created_at": "={{ $json.created_at }}",
+            "session_id": "={{ $json.session_id }}",
+            "customer_email": "={{ $json.customer_email }}",
+            "order_id": "={{ $json.order_id }}",
+            "issue_type": "={{ $json.issue_type }}",
+            "issue_summary": "={{ $json.issue_summary }}",
+            "ticket_status": "={{ $json.ticket_status }}",
+            "notification_status": "={{ $json.notification_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ticket_status",
+              "displayName": "ticket_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notification_status",
+              "displayName": "notification_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2416,
+        -480
+      ],
+      "id": "705e32c2-4495-402c-bd9a-b18f9ef7e2c8",
+      "name": "Append Support Ticket"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bedbbbb9-87b2-4c06-9582-52074eefa137",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "ee307e12-f7d2-4dde-98ed-165b0a8362f1",
+              "name": "ticket_id",
+              "value": "={{ $('Generate Ticket ID').first().json.ticket_id }}",
+              "type": "string"
+            },
+            {
+              "id": "caacb1ff-7c52-4373-a196-7bf5316fb2c8",
+              "name": "status",
+              "value": "CREATED",
+              "type": "string"
+            },
+            {
+              "id": "e77ff832-c6e7-49b1-ae7b-f25ad5e03e9b",
+              "name": "notification_status",
+              "value": "SENT",
+              "type": "string"
+            },
+            {
+              "id": "ec2c2a5c-ebd4-47b7-9aeb-171147a1f11b",
+              "name": "message",
+              "value": "Support ticket created successfully. Support notification sent.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3104,
+        -576
+      ],
+      "id": "3153589f-6969-4418-bd8d-05ffe7ef9223",
+      "name": "Return Created Ticket"
+    },
+    {
+      "parameters": {
+        "sendTo": "support@example.com",
+        "subject": "={{ '[Northstar Support] New Ticket - ' + $('Generate Ticket ID').first().json.ticket_id }}",
+        "message": "=\n{{ `A new customer support ticket has been created.\n\nTicket ID: ${$('Generate Ticket ID').first().json.ticket_id}\nCreated At: ${$('Generate Ticket ID').first().json.created_at}\n\nCustomer Email: ${$('Generate Ticket ID').first().json.customer_email}\nOrder ID: ${$('Generate Ticket ID').first().json.order_id || 'N/A'}\n\nIssue Type: ${$('Generate Ticket ID').first().json.issue_type}\n\nIssue Summary:\n${$('Generate Ticket ID').first().json.issue_summary}\n\nTicket Status: OPEN\n\nPlease review this ticket and follow up with the customer.\n\n---\nNorthstar Customer Support Automation\n` }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2656,
+        -480
+      ],
+      "id": "6df47c57-0506-4359-b6b4-d982afdb9d42",
+      "name": "Send Support Notification",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Northstar Support Demo"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Support Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Append Support Ticket').first().json.ticket_id }}",
+            "notification_status": "SENT"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ticket_status",
+              "displayName": "ticket_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "notification_status",
+              "displayName": "notification_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2880,
+        -576
+      ],
+      "id": "c1098049-1ae8-43b1-8c89-38f8e9192d2e",
+      "name": "Update Notificaiton Status - SENT"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Northstar Support Demo"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SUPPORT_TICKETS_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Support Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Append Support Ticket').first().json.ticket_id }}",
+            "notification_status": "FAILED"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ticket_status",
+              "displayName": "ticket_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notification_status",
+              "displayName": "notification_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2880,
+        -384
+      ],
+      "id": "e5aabbf6-cff7-488a-8c57-1b7d4c7332ad",
+      "name": "Update Notification Status - FAILED"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0a543491-64df-44b2-89e7-5f89c771c21c",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "ad71f050-7881-489e-8198-a4427d11d630",
+              "name": "ticket_id",
+              "value": "={{ $('Generate Ticket ID').first().json.ticket_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b8d8ff2f-e635-47e4-be7f-119d275d3efd",
+              "name": "status",
+              "value": "CREATED",
+              "type": "string"
+            },
+            {
+              "id": "adecd320-1b94-48cf-9fae-3bb999a90c06",
+              "name": "notification_status",
+              "value": "FAILED",
+              "type": "string"
+            },
+            {
+              "id": "0170dac7-8fba-417a-80d5-79a9c2af9845",
+              "name": "message",
+              "value": "Support ticket created successfully, but the support notification could not be sent.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3104,
+        -384
+      ],
+      "id": "14a05d14-0eaf-457c-bdd4-7e0b70797fcb",
+      "name": "Return Notification Failed"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.request_status }}",
+                    "rightValue": "VALIDATION_FAILED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "ae5815ca-0ef9-45ed-83e9-6a49fc49df4c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Invalid"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "96985720-6b8f-4c9a-8066-be6e8ee0ff91",
+                    "leftValue": "={{ $json.request_status }}",
+                    "rightValue": "PENDING_CONFIRMATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Pending"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "f25cbbe0-9240-46b7-848b-f248e1bfb5b9",
+                    "leftValue": "={{ $json.request_status }}",
+                    "rightValue": "CONFIRMATION_RECEIVED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmation Received"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        -352,
+        -448
+      ],
+      "id": "ab54d248-9d4c-4cb7-8e7c-0400da95d6d6",
+      "name": "Switch - Request Status"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\n\n// Generate a deterministic Markdown preview\nconst preview = [\n  '## 📋 Support Ticket Preview',\n  '',\n  '**Customer Information**',\n  '',\n  `- Email: ${input.customer_email}`,\n  `- Order ID: ${input.order_id || 'N/A'}`,\n  '',\n  '---',\n  '',\n  '**Issue Details**',\n  '',\n  `- Issue type: ${input.issue_type}`,\n  `- Issue summary: ${input.issue_summary}`,\n  '',\n  '---',\n  '',\n  '**Status: ⏳ Awaiting Confirmation**',\n  '',\n  'Please review the information above.',\n  '',\n  'If the details are correct, reply with:',\n  '',\n  '**CONFIRM SUPPORT TICKET**'\n].join('\\n');\n\n// Return preview and normalized ticket data\nreturn {\n  json: {\n    ...input,\n    success: true,\n    status: 'PENDING_CONFIRMATION',\n    ticket_id: null,\n    preview_markdown: preview,\n    message: preview\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -944
+      ],
+      "id": "e5b39b59-79c0-4590-b6a6-6615673e0392",
+      "name": "Prepare Ticket Preview"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a14cbee8-0c79-4564-8a02-73ef3d11f6cb",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "d6190bca-fe82-4c3d-a510-60f1d6584104",
+              "name": "status",
+              "value": "PENDING_CONFIRMATION",
+              "type": "string"
+            },
+            {
+              "id": "40bae668-b6de-4448-9ff0-b5b6e3f51e24",
+              "name": "ticket_id",
+              "value": "={{ '' }}",
+              "type": "string"
+            },
+            {
+              "id": "0ba793af-d165-48d2-ae20-c539828a13e9",
+              "name": "session_id",
+              "value": "={{ $('Prepare Ticket Preview').first().json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "132f6fb1-77ac-4809-a4ee-1ede57bb5ca6",
+              "name": "preview_markdown",
+              "value": "={{ $('Prepare Ticket Preview').first().json.preview_markdown }}",
+              "type": "string"
+            },
+            {
+              "id": "e92deb22-a6af-48c3-8a51-eca64abeb646",
+              "name": "message",
+              "value": "={{ $('Prepare Ticket Preview').first().json.preview_markdown }}",
+              "type": "string"
+            },
+            {
+              "id": "b97d850a-71eb-4f0a-959a-47af4ef2f5c3",
+              "name": "request_id",
+              "value": "={{ $('Prepare Ticket Preview').first().json.request_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1936,
+        -1152
+      ],
+      "id": "e275a214-b688-4895-9990-dddb2666c78d",
+      "name": "Return Pending Ticket Preview"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "P02 - Pending Support Tickets"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.session_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        96,
+        -464
+      ],
+      "id": "88192742-1f6b-45e3-b917-5bfc237905ec",
+      "name": "Load Pending Ticket",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Retrieve the validated request\nconst request =\n  $('Validate Ticket Request').first().json;\n\nconst rows = $input.all()\n  .map(item => item.json)\n  .filter(row => row.id != null);\n\n// 2. Standard authorization rejection\nfunction reject(status, message) {\n  return [{\n    json: {\n      success: false,\n      ticket_id: '',\n      authorization_passed: false,\n      session_id: request.session_id,\n      request_id: request.request_id,\n      status,\n      message\n    }\n  }];\n}\n\n// 3. Verify explicit confirmation\nif (request.customer_confirmed !== true) {\n  return reject(\n    'CONFIRMATION_REQUIRED',\n    'Explicit customer confirmation is required.'\n  );\n}\n\n// 4. Verify pending record existence\nif (rows.length === 0) {\n  return reject(\n    'PENDING_NOT_FOUND',\n    'No pending support ticket was found. Please prepare a new ticket preview.'\n  );\n}\n\nif (rows.length !== 1) {\n  return reject(\n    'AMBIGUOUS_PENDING_TICKET',\n    'Multiple pending ticket records were found. Ticket creation has been blocked.'\n  );\n}\n\nconst pending = rows[0];\n\n// 5. Verify session binding\nif (pending.session_id !== request.session_id) {\n  return reject(\n    'SESSION_MISMATCH',\n    'The pending ticket does not belong to this session.'\n  );\n}\n\n// 6. Verify preview version binding\nif (\n  !String(pending.request_id ?? '').trim() ||\n  String(pending.request_id) !==\n    String(request.request_id)\n) {\n  return reject(\n    'REQUEST_VERSION_MISMATCH',\n    'The support ticket details have changed. Please review the latest preview before confirming.'\n  );\n}\n\n// 7. Verify authorization status\nif (pending.status === 'PREPARED') {\n  return reject(\n    'PREVIEW_NOT_ACTIVATED',\n    'The ticket preview is not ready for confirmation.'\n  );\n}\n\nif (pending.status === 'CONSUMED') {\n  return reject(\n    'CONFIRMATION_ALREADY_USED',\n    'This confirmation has already been used.'\n  );\n}\n\nif (pending.status === 'PROCESSING') {\n  return reject(\n    'TICKET_PROCESSING',\n    'Your support ticket is already being processed.'\n  );\n}\n\nif (pending.status === 'EXPIRED') {\n  return reject(\n    'CONFIRMATION_EXPIRED',\n    'Your confirmation has expired. Please request a new ticket preview.'\n  );\n}\n\nif (pending.status !== 'PENDING') {\n  return reject(\n    'INVALID_PENDING_STATUS',\n    'This pending ticket is no longer available for confirmation.'\n  );\n}\n\n// 8. Verify expiration\nconst expiresAt = Date.parse(\n  pending.expires_at ?? ''\n);\n\nif (!Number.isFinite(expiresAt)) {\n  return reject(\n    'INVALID_PENDING_TICKET',\n    'The pending ticket has an invalid expiration time.'\n  );\n}\n\nif (Date.now() >= expiresAt) {\n  return reject(\n    'CONFIRMATION_EXPIRED',\n    'Your confirmation has expired. Please request a new ticket preview.'\n  );\n}\n\n// 9. Validate stored ticket information\nconst allowedTypes = [\n  'DELIVERY_ISSUE',\n  'DAMAGED_ITEM',\n  'REFUND_REQUEST',\n  'COMPENSATION_REQUEST',\n  'PAYMENT_DISPUTE',\n  'OTHER'\n];\n\nconst email = String(\n  pending.customer_email ?? ''\n).trim();\n\nconst summary = String(\n  pending.issue_summary ?? ''\n).trim();\n\nif (\n  !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) ||\n  email.length > 254 ||\n  !allowedTypes.includes(pending.issue_type) ||\n  summary.length < 10 ||\n  summary.length > 1000 ||\n  !String(pending.preview_markdown ?? '').trim()\n) {\n  return reject(\n    'INVALID_PENDING_TICKET',\n    'The stored ticket information is incomplete or invalid.'\n  );\n}\n\n// 10. Verify business payload consistency\nconst fields = [\n  'customer_email',\n  'order_id',\n  'issue_type',\n  'issue_summary'\n];\n\nfor (const field of fields) {\n  if (\n    String(request[field] ?? '') !==\n    String(pending[field] ?? '')\n  ) {\n    return reject(\n      'AUTHORIZATION_PAYLOAD_MISMATCH',\n      'The ticket details have changed. Please request a new preview.'\n    );\n  }\n}\n\n// 11. Return authorized stored request\nreturn [{\n  json: {\n    success: true,\n    status: 'AUTHORIZED',\n    authorization_passed: true,\n\n    pending_ticket_id: pending.id,\n    session_id: pending.session_id,\n    request_id: pending.request_id,\n\n    customer_email: pending.customer_email,\n    order_id: pending.order_id || '',\n    issue_type: pending.issue_type,\n    issue_summary: pending.issue_summary,\n    preview_markdown: pending.preview_markdown,\n\n    customer_confirmed: true,\n    validation_passed: true,\n    validation_error: '',\n\n    authorized_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -464
+      ],
+      "id": "c63a3058-2044-4f0c-b1f1-1b6d574d319f",
+      "name": "Verify Authorization"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "d993d065-ad5a-4b33-b198-f97541db56ef",
+              "leftValue": "={{ $json.authorization_passed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        544,
+        -464
+      ],
+      "id": "cc0bf114-4159-4e8c-864b-cd9959c4a696",
+      "name": "IF - Authorization Passed"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        768,
+        -368
+      ],
+      "id": "f98f236e-71ba-4383-ba42-5f888bfebef8",
+      "name": "Return Authorization Error"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "P02 - Pending Support Tickets"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.pending_ticket_id }}"
+            },
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.session_id }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "PENDING"
+            },
+            {
+              "keyName": "expires_at",
+              "condition": "gt",
+              "keyValue": "={{ $now.toISO() }}"
+            },
+            {
+              "keyName": "request_id",
+              "keyValue": "={{ $json.request_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "PROCESSING"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "preview_markdown",
+              "displayName": "preview_markdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        -560
+      ],
+      "id": "fa2d06c1-ec77-42ba-87ef-0b617213ab95",
+      "name": "Consume Authorization",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Retrieve the authorized request\nconst authorized =\n  $('Verify Authorization').first().json;\n\n// 2. Retrieve updated Data Table records\nconst rows = $input.all()\n  .map(item => item.json)\n  .filter(row => row.id != null);\n\n// 3. Standard rejection response\nfunction reject(status, message) {\n  return [{\n    json: {\n      success: false,\n      ticket_id: '',\n      authorization_consumed: false,\n      session_id: authorized.session_id,\n      request_id: authorized.request_id,\n      status,\n      message\n    }\n  }];\n}\n\n// 4. Verify original authorization\nif (authorized.authorization_passed !== true) {\n  return reject(\n    'AUTHORIZATION_REQUIRED',\n    'Ticket authorization has not been granted.'\n  );\n}\n\n// 5. Verify update result\nif (rows.length !== 1) {\n  return reject(\n    'AUTHORIZATION_CONSUMPTION_FAILED',\n    'The confirmation could not be reserved. Ticket creation has been blocked.'\n  );\n}\n\nconst updated = rows[0];\n\n// 6. Verify record identity and state\nif (\n  String(updated.id) !==\n    String(authorized.pending_ticket_id) ||\n  updated.session_id !== authorized.session_id ||\n  updated.status !== 'PROCESSING'\n) {\n  return reject(\n    'AUTHORIZATION_STATE_MISMATCH',\n    'The authorization record is invalid.'\n  );\n}\n\n// 7. Verify preview version\nif (\n  !String(updated.request_id ?? '').trim() ||\n  String(updated.request_id) !==\n    String(authorized.request_id)\n) {\n  return reject(\n    'REQUEST_VERSION_MISMATCH',\n    'The ticket preview version has changed. Ticket creation has been blocked.'\n  );\n}\n\n// 8. Verify business payload integrity\nconst fields = [\n  'customer_email',\n  'order_id',\n  'issue_type',\n  'issue_summary',\n  'preview_markdown'\n];\n\nfor (const field of fields) {\n  if (\n    String(updated[field] ?? '') !==\n    String(authorized[field] ?? '')\n  ) {\n    return reject(\n      'AUTHORIZATION_PAYLOAD_MISMATCH',\n      'The ticket details have changed. Ticket creation has been blocked.'\n    );\n  }\n}\n\n// 9. Return verified authorization\nreturn [{\n  json: {\n    ...authorized,\n    success: true,\n    status: 'AUTHORIZATION_CONSUMED',\n    authorization_consumed: true,\n    consumed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -560
+      ],
+      "id": "c14c3a63-c960-440c-b726-9dfa07ae0eb3",
+      "name": "Verify Authorization Consumption"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "b3443ac0-5c3a-4b47-a249-2bebad4ac7f5",
+              "leftValue": "={{ $json.authorization_consumed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1216,
+        -560
+      ],
+      "id": "10537cbc-4d47-4314-ba34-fa20a63f8639",
+      "name": "IF - Authorization Consumed"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "P02 - Pending Support Tickets"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Verify Authorization Consumption').first().json.pending_ticket_id }}"
+            },
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('Verify Authorization Consumption').first().json.session_id }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "PROCESSING"
+            },
+            {
+              "keyName": "request_id",
+              "keyValue": "={{ $('Verify Authorization Consumption').first().json.request_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "CONSUMED"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "preview_markdown",
+              "displayName": "preview_markdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3408,
+        -688
+      ],
+      "id": "405ca1d1-3d4a-426f-98c0-caafca4d8b8a",
+      "name": "Finalize Authorization",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Retrieve the original authorized request\nconst authorized =\n  $('Verify Authorization Consumption').first().json;\n\n// 2. Recover the original business result\nconst resultNodes = [\n  'Return Existing Ticket',\n  'Return Created Ticket',\n  'Return Notification Failed'\n];\n\nconst executedNodes = resultNodes.filter(\n  nodeName => $(nodeName).isExecuted\n);\n\nif (executedNodes.length !== 1) {\n  throw new Error(\n    'Expected exactly one support ticket result.'\n  );\n}\n\nconst businessResult =\n  $(executedNodes[0]).first().json;\n\n// 3. Validate the original business result\nif (\n  !businessResult ||\n  businessResult.success !== true ||\n  !['CREATED', 'ALREADY_EXISTS'].includes(\n    businessResult.status\n  ) ||\n  !String(businessResult.ticket_id ?? '').trim()\n) {\n  throw new Error(\n    'Unable to recover a valid support ticket result.'\n  );\n}\n\n// 4. Retrieve authorization update results\nconst rows = $input.all()\n  .map(item => item.json);\n\n// 5. Verify authorization finalization\nconst finalized =\n  rows.length === 1 &&\n  !rows[0].error &&\n  rows[0].id != null &&\n  String(rows[0].id) ===\n    String(authorized.pending_ticket_id) &&\n  rows[0].session_id === authorized.session_id &&\n  String(authorized.request_id ?? '').trim() !== '' &&\n  String(rows[0].request_id ?? '') ===\n    String(authorized.request_id) &&\n  rows[0].status === 'CONSUMED';\n\n// 6. Preserve the original business result\nreturn [{\n  json: {\n    ...businessResult,\n\n    request_id: authorized.request_id,\n\n    authorization_finalized: finalized,\n\n    authorization_status: finalized\n      ? 'CONSUMED'\n      : 'FINALIZATION_FAILED',\n\n    authorization_warning: finalized\n      ? ''\n      : 'Ticket processing completed, but authorization finalization could not be verified. Manual review is required.'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3616,
+        -688
+      ],
+      "id": "7188a526-48bf-47e0-8ba9-32355b8fe5f4",
+      "name": "Return Final Result"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "P02 - Pending Support Tickets"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.session_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        -944
+      ],
+      "id": "2a4d3109-1a44-4204-ab22-2236e4779db9",
+      "name": "Check Existing Pending State",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Retrieve the new ticket preview\nconst request =\n  $('Prepare Ticket Preview').first().json;\n\n// 2. Retrieve existing records\nconst rows = $input.all()\n  .map(item => item.json)\n  .filter(row => row.id != null);\n\n// 3. Define rejection response\nfunction reject(status, message) {\n  return [{\n    json: {\n      success: false,\n      preparation_allowed: false,\n      ticket_id: '',\n      session_id: request.session_id,\n      request_id: request.request_id,\n      status,\n      message\n    }\n  }];\n}\n\n// 4. Validate request identity\nif (\n  !String(request.session_id ?? '').trim() ||\n  !String(request.request_id ?? '').trim()\n) {\n  return reject(\n    'INVALID_PREPARATION_REQUEST',\n    'A valid session and request ID are required.'\n  );\n}\n\n// 5. Allow first-time preparation\nif (rows.length === 0) {\n  return [{\n    json: {\n      ...request,\n      preparation_allowed: true,\n      preparation_action: 'INSERT',\n      existing_pending_id: null,\n      existing_status: null,\n      existing_request_id: null\n    }\n  }];\n}\n\n// 6. Reject ambiguous records\nif (rows.length !== 1) {\n  return reject(\n    'AMBIGUOUS_PENDING_TICKET',\n    'Multiple pending ticket records were found. Please contact customer support.'\n  );\n}\n\nconst existing = rows[0];\n\n// 7. Verify session ownership\nif (existing.session_id !== request.session_id) {\n  return reject(\n    'SESSION_MISMATCH',\n    'The existing request does not belong to this session.'\n  );\n}\n\n// 8. Protect processing records\nif (existing.status === 'PROCESSING') {\n  return reject(\n    'TICKET_PROCESSING',\n    'Your previous support request is still being processed. Please do not submit another request yet.'\n  );\n}\n\n// 9. Validate existing state\nconst replaceableStates = [\n  'PREPARED',\n  'PENDING',\n  'CONSUMED',\n  'EXPIRED'\n];\n\nif (!replaceableStates.includes(existing.status)) {\n  return reject(\n    'INVALID_PENDING_STATUS',\n    'The existing support request is in an invalid state.'\n  );\n}\n\n// 10. Allow conditional replacement\nreturn [{\n  json: {\n    ...request,\n    preparation_allowed: true,\n    preparation_action: 'UPDATE',\n    existing_pending_id: existing.id,\n    existing_status: existing.status,\n    existing_request_id: existing.request_id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -944
+      ],
+      "id": "b659318c-c982-4872-827c-24488ae5efa1",
+      "name": "Validate Preparation Permission"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "f91a08dd-6bd0-4fdb-93b3-a7d0d330eb59",
+              "leftValue": "={{ $json.preparation_allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        768,
+        -944
+      ],
+      "id": "8b4431df-7cbf-4911-b577-dbe93bfb027b",
+      "name": "IF - Preparation Allowed"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2f9503f6-22f4-445d-ad82-cf9b58d78f2d",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "0829fdb6-c351-4fca-a9a6-4a2c7c32458f",
+              "name": "ticket_id",
+              "value": "={{ '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5ae62984-386c-44ad-b087-a2ac29a951cd",
+              "name": "session_id",
+              "value": "={{ $json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "7c3fdca9-7140-49c0-a821-168c9b07e2f7",
+              "name": "request_id",
+              "value": "={{ $json.request_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4ad650e9-84ff-4a1c-8572-1333704163f4",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "34894ff0-fba3-4010-a71c-6214f184907b",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1088,
+        -928
+      ],
+      "id": "2ace81a9-82fe-4ef7-8221-fe2a211c9db3",
+      "name": "Return Preparation Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "503b0bc6-7671-4db1-8faa-9e29c857cb5d",
+              "leftValue": "={{ $json.preparation_action }}",
+              "rightValue": "INSERT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1088,
+        -1120
+      ],
+      "id": "c34a51c4-04bc-45cd-8d83-b4bf1064aba6",
+      "name": "IF - Insert Required"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "P02 - Pending Support Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $json.session_id }}",
+            "request_id": "={{ $json.request_id }}",
+            "customer_email": "={{ $json.customer_email }}",
+            "order_id": "={{ $json.order_id }}",
+            "issue_type": "={{ $json.issue_type }}",
+            "issue_summary": "={{ $json.issue_summary }}",
+            "preview_markdown": "={{ $json.preview_markdown }}",
+            "status": "PREPARED",
+            "expires_at": "={{ $now.plus({ minutes: 30 }).toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "preview_markdown",
+              "displayName": "preview_markdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1328,
+        -1200
+      ],
+      "id": "a9dfce57-1a38-4b8c-93d7-c1c6545ad68e",
+      "name": "Insert Pending Ticket",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PENDING_TICKETS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "P02 - Pending Support Tickets"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "keyValue": "={{ $json.request_id }}"
+            },
+            {
+              "keyName": "customer_email",
+              "keyValue": "={{ $json.customer_email }}"
+            },
+            {
+              "keyName": "order_id",
+              "keyValue": "={{ $json.order_id }}"
+            },
+            {
+              "keyName": "issue_type",
+              "keyValue": "={{ $json.issue_type }}"
+            },
+            {
+              "keyName": "issue_summary",
+              "keyValue": "={{ $json.issue_summary }}"
+            },
+            {
+              "keyName": "preview_markdown",
+              "keyValue": "={{ $json.preview_markdown }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "PREPARED"
+            },
+            {
+              "keyName": "expires_at",
+              "keyValue": "={{ $now.plus({ minutes: 30 }).toISO() }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "issue_type",
+              "displayName": "issue_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "issue_summary",
+              "displayName": "issue_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "preview_markdown",
+              "displayName": "preview_markdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1328,
+        -1040
+      ],
+      "id": "647890f8-e081-474a-ac1d-cc6604e971bb",
+      "name": "Update Pending Ticket"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Retrieve the original preparation request\nconst request =\n  $('Validate Preparation Permission').first().json;\n\n// 2. Retrieve Data Table write results\nconst rows = $input.all()\n  .map(item => item.json)\n  .filter(row => row.id != null);\n\n// 3. Define rejection response\nfunction reject(status, message) {\n  return [{\n    json: {\n      success: false,\n      save_verified: false,\n      ticket_id: '',\n      session_id: request.session_id,\n      request_id: request.request_id,\n      status,\n      message\n    }\n  }];\n}\n\n// 4. Verify preparation permission\nif (request.preparation_allowed !== true) {\n  return reject(\n    'PREPARATION_NOT_ALLOWED',\n    'Ticket preparation has not been authorized.'\n  );\n}\n\n// 5. Verify exactly one record was saved\nif (rows.length !== 1) {\n  return reject(\n    'PENDING_SAVE_FAILED',\n    'The ticket preview could not be saved reliably.'\n  );\n}\n\nconst saved = rows[0];\n\n// 6. Verify the saved record identity\nif (\n  saved.session_id !== request.session_id ||\n  String(saved.request_id ?? '') !==\n    String(request.request_id)\n) {\n  return reject(\n    'PENDING_SAVE_VERSION_MISMATCH',\n    'The saved ticket preview does not match the current request.'\n  );\n}\n\n// 7. Verify the updated record ID\nif (\n  request.preparation_action === 'UPDATE' &&\n  String(saved.id) !==\n    String(request.existing_pending_id)\n) {\n  return reject(\n    'PENDING_SAVE_ID_MISMATCH',\n    'The updated ticket preview record is invalid.'\n  );\n}\n\n// 8. Verify the authorization state\nif (saved.status !== 'PREPARED') {\n  return reject(\n    'PENDING_SAVE_STATE_MISMATCH',\n    'The saved ticket preview has an invalid state.'\n  );\n}\n\n// 9. Verify business data integrity\nconst fields = [\n  'customer_email',\n  'order_id',\n  'issue_type',\n  'issue_summary',\n  'preview_markdown'\n];\n\nfor (const field of fields) {\n  if (\n    String(saved[field] ?? '') !==\n    String(request[field] ?? '')\n  ) {\n    return reject(\n      'PENDING_SAVE_PAYLOAD_MISMATCH',\n      'The saved ticket details do not match the original request.'\n    );\n  }\n}\n\n// 10. Verify expiration time\nconst expiresAt = Date.parse(saved.expires_at ?? '');\n\nif (\n  !Number.isFinite(expiresAt) ||\n  Date.now() >= expiresAt\n) {\n  return reject(\n    'INVALID_PENDING_EXPIRATION',\n    'The saved ticket preview has an invalid expiration time.'\n  );\n}\n\n// 11. Return verified preparation result\nreturn [{\n  json: {\n    ...request,\n\n    success: true,\n    save_verified: true,\n    status: 'PREPARED',\n\n    pending_ticket_id: saved.id,\n    expires_at: saved.expires_at,\n\n    preview_markdown: saved.preview_markdown,\n    message: saved.preview_markdown\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -1136
+      ],
+      "id": "b0dc328c-3216-4d77-9d9e-fd94c73f1011",
+      "name": "Verify Pending Ticket Saved"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "913c0807-eca4-4321-a27a-77a80263214d",
+              "leftValue": "={{ $json.save_verified }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1712,
+        -1136
+      ],
+      "id": "3015124c-10cf-458a-8062-6650b49e62ed",
+      "name": "IF - Pending Save Verified"
+    },
+    {
+      "parameters": {
+        "content": "## Request Validation & Routing",
+        "height": 1072,
+        "width": 448,
+        "color": "#E0DCDC"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -464,
+        -1280
+      ],
+      "typeVersion": 1,
+      "id": "c662223b-191f-4500-a336-e4eecb199e4d",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Ticket Preparation",
+        "height": 512,
+        "width": 2128
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        48,
+        -1280
+      ],
+      "typeVersion": 1,
+      "id": "7090204f-2561-495f-a2a1-3f6b3f98f972",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Authorization & Replay Protection",
+        "height": 512,
+        "width": 1360,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        48,
+        -720
+      ],
+      "typeVersion": 1,
+      "id": "f062ebae-2241-416d-8971-57d82ef0cbf5",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Deduplication & Ticket Creation",
+        "height": 512,
+        "width": 1104,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1456,
+        -720
+      ],
+      "typeVersion": 1,
+      "id": "38ef4864-1c79-45c1-8df1-cf90cc73b370",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Notification & Finalization",
+        "height": 512,
+        "width": 1216,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2608,
+        -720
+      ],
+      "typeVersion": 1,
+      "id": "c455f7d6-42e8-41c8-a5cf-06d722a06f60",
+      "name": "Sticky Note5"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Ticket Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Ticket Request": {
+      "main": [
+        [
+          {
+            "node": "Switch - Request Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Ticket": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Request": {
+      "main": [
+        [
+          {
+            "node": "IF - Duplicate Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Duplicate Found": {
+      "main": [
+        [
+          {
+            "node": "Return Existing Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Ticket ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Ticket ID": {
+      "main": [
+        [
+          {
+            "node": "Append Support Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Support Ticket": {
+      "main": [
+        [
+          {
+            "node": "Send Support Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Support Notification": {
+      "main": [
+        [
+          {
+            "node": "Update Notificaiton Status - SENT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Notification Status - FAILED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notificaiton Status - SENT": {
+      "main": [
+        [
+          {
+            "node": "Return Created Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notification Status - FAILED": {
+      "main": [
+        [
+          {
+            "node": "Return Notification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Request Status": {
+      "main": [
+        [
+          {
+            "node": "Return Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Ticket Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load Pending Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Ticket Preview": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Pending State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Pending Ticket": {
+      "main": [
+        [
+          {
+            "node": "Verify Authorization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Authorization": {
+      "main": [
+        [
+          {
+            "node": "IF - Authorization Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Authorization Passed": {
+      "main": [
+        [
+          {
+            "node": "Consume Authorization",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Authorization Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consume Authorization": {
+      "main": [
+        [
+          {
+            "node": "Verify Authorization Consumption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Authorization Consumption": {
+      "main": [
+        [
+          {
+            "node": "IF - Authorization Consumed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Authorization Consumed": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Authorization Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Created Ticket": {
+      "main": [
+        [
+          {
+            "node": "Finalize Authorization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Notification Failed": {
+      "main": [
+        [
+          {
+            "node": "Finalize Authorization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Existing Ticket": {
+      "main": [
+        [
+          {
+            "node": "Finalize Authorization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Authorization": {
+      "main": [
+        [
+          {
+            "node": "Return Final Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Final Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Pending State": {
+      "main": [
+        [
+          {
+            "node": "Validate Preparation Permission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Preparation Permission": {
+      "main": [
+        [
+          {
+            "node": "IF - Preparation Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Preparation Allowed": {
+      "main": [
+        [
+          {
+            "node": "IF - Insert Required",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Preparation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Insert Required": {
+      "main": [
+        [
+          {
+            "node": "Insert Pending Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Pending Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Pending Ticket": {
+      "main": [
+        [
+          {
+            "node": "Verify Pending Ticket Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pending Ticket": {
+      "main": [
+        [
+          {
+            "node": "Verify Pending Ticket Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Pending Ticket Saved": {
+      "main": [
+        [
+          {
+            "node": "IF - Pending Save Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Pending Save Verified": {
+      "main": [
+        [
+          {
+            "node": "Return Pending Ticket Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Preparation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

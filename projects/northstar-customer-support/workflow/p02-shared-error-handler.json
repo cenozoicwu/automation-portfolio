@@ -1,5 +1,5 @@
 {
-  "name": "P02 - Shared Error Handler",
+  "name": "p02-shared-error-handler",
   "nodes": [
     {
       "parameters": {
@@ -137,13 +137,15 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
           "mode": "list",
+          "cachedResultName": "Northstar Support Demo"
         },
         "sheetName": {
           "__rl": true,
-          "value": 798035043,
+          "value": "REPLACE_WITH_AGENT_ERROR_LOGS_SHEET_ID",
           "mode": "list",
+          "cachedResultName": "Agent Error Logs"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -225,12 +227,6 @@
       ],
       "id": "a59b8c16-1a8c-4226-aeec-ff9d22cc647f",
       "name": "Append Agent Error Log",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "REPLACE_WITH_YOUR_CREDENTIALS_ID",
-          "name": "Google Sheets account"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
@@ -300,12 +296,6 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "0b57fcdc-3861-4d84-b14c-7cf4223e17a0",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "6deb8ec761c875dd5b5545926ea10de9e3db547082f3cce575b6add425140301"
-  },
   "nodeGroups": [],
-  "id": "HPXrjW6qI19Xlcb0",
   "tags": []
 }
