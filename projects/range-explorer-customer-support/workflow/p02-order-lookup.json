@@ -6,14 +6,12 @@
         "documentId": {
           "__rl": true,
           "value": "REPLACE_WITH_SPREADSHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Northstar Support Demo"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": "REPLACE_WITH_ORDERS_SHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Orders"
+          "mode": "id"
         },
         "filtersUI": {
           "values": [

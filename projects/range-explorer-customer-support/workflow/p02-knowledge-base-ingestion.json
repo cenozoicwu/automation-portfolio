@@ -1,0 +1,218 @@
+{
+  "name": "p02-knowledge-base-ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        0
+      ],
+      "id": "2fb52cbe-be25-4319-8971-259ae2302cbb",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "range_explorer_knowledge_base_V2",
+          "mode": "id"
+        },
+        "embeddingBatchSize": 768,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.4,
+      "position": [
+        432,
+        0
+      ],
+      "id": "13292a8b-ab3c-4faf-8367-eb6bb5765370",
+      "name": "Qdrant Vector Store"
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        416,
+        240
+      ],
+      "id": "c530746b-03a7-4876-a811-3f69705e1c60",
+      "name": "Embeddings Ollama"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aacd442f-b693-4524-9c01-6d8170683c8f",
+              "name": "text",
+              "value": "# RANGE EXPLORER OUTDOOR — CUSTOMER SUPPORT KNOWLEDGE BASE  Version: 1.1   Document type: Internal demo policy   All information is fictional.  ## COMPANY OVERVIEW  Range Explorer Outdoor is a fictional UK-based online retailer specializing in hiking apparel, camping equipment, backpacks, and outdoor accessories.  The company serves outdoor enthusiasts across the United Kingdom, helping customers explore the outdoors with confidence.  Brand slogan: Explore Further. Experience More.  Oliver Bennett is the company's AI Customer Support Assistant, helping customers with product information, order tracking, delivery issues, store policies, and human support escalation.  ## RETURNS POLICY  Standard products can be returned within 30 calendar days after delivery.  Returned products must be unused, clean, and in their original packaging.  Customers must provide proof of purchase.  Used products without manufacturing defects are not eligible for standard returns.  Items marked Final Sale cannot be returned unless they are defective.  Refunds are issued to the original payment method after inspection and approval.  Refund processing normally takes 5–7 business days after approval.  Customers should contact support before sending an item back.  ## DAMAGED OR DEFECTIVE ITEMS  Customers should report damaged or defective items within 7 calendar days of delivery.  The customer should provide an order number and photos of the damage.  A human support representative must review and approve refunds or replacements.  The AI assistant must not promise an automatic refund or replacement.  ## SHIPPING POLICY  Standard shipping within the United Kingdom normally takes 3–5 business days after shipment.  Express shipping normally takes 1–2 business days after shipment.  Orders may require 1–2 business days for processing before shipment.  Tracking information is provided when an order is shipped.  Delivery estimates are not guaranteed.  International shipping availability and cost depend on the destination.  ## PRODUCT FAQ  Range Explorer Outdoor hiking backpacks are designed for outdoor recreational use.  Backpacks should be cleaned using a damp cloth and mild soap.  Machine washing is not recommended.  Water-resistant products are not necessarily waterproof.  Customers should check individual product specifications for capacity and dimensions.  Product availability must be confirmed from current inventory data.  ## SUPPORT ESCALATION  Requests involving damaged items, missing packages, disputed payments, policy exceptions, or complaints should be referred to human support.  The AI assistant may explain published policies but cannot approve refunds, modify orders, or issue compensation.  If a policy answer is not available in the knowledge base, the assistant should say it cannot verify the policy and offer human assistance.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "266c3cda-f53d-459d-aebf-a4e30e90193d",
+      "name": "Prepare Knowledge Document"
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "section_id",
+                "value": "={{ $json.section_id }}"
+              },
+              {
+                "name": "section_title",
+                "value": "={{ $json.section_title }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $json.source }}"
+              },
+              {
+                "name": "document_version",
+                "value": "={{ $json.document_version }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        240
+      ],
+      "id": "34944de2-af40-4ed5-8b0d-7d56e74c57de",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "separator": "\\n\\n",
+        "chunkSize": 2000,
+        "chunkOverlap": 80
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        624,
+        448
+      ],
+      "id": "bebdb5a2-8f7c-4284-a9af-38f86202e104",
+      "name": "Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst document = $input.first().json.text;\n\nif (typeof document !== 'string' || !document.trim()) {\n  throw new Error('Knowledge document is empty or invalid.');\n}\n\n// Split by Markdown level-2 heading markers\n// Supports both multiline and flattened text\nconst sections = document\n  .split(/(?<!#)##[ \\t]+/)\n  .slice(1)\n  .map(section => section.trim())\n  .filter(Boolean);\n\nif (sections.length === 0) {\n  throw new Error('No knowledge sections found.');\n}\n\n// Extract uppercase section headings and content\nreturn sections.map((section, index) => {\n  const match = section.match(\n    /^([A-Z][A-Z0-9 &/(),'-]*?)(?=\\s{2,}|\\r?\\n)/\n  );\n\n  if (!match) {\n    throw new Error(\n      `Unable to identify heading in section ${index + 1}`\n    );\n  }\n\n  const title = match[1].trim();\n  const content = section.slice(match[0].length).trim();\n\n  if (!content) {\n    throw new Error(`Empty content in section: ${title}`);\n  }\n\n  return {\n    json: {\n      section_id: `KB-${String(index + 1).padStart(3, '0')}`,\n      section_title: title,\n      text: `${title}\\n\\n${content}`,\n      source: 'Range Explorer Outdoor Knowledge Base',\n      document_version: '1.1'\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f4429c33-2243-490a-8b31-ffedcda7e89f",
+      "name": "Split Knowledge by Section"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "main": [
+        []
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Prepare Knowledge Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Knowledge Document": {
+      "main": [
+        [
+          {
+            "node": "Split Knowledge by Section",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Knowledge by Section": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
